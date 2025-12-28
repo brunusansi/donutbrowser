@@ -58,13 +58,13 @@ export function ProxyFormDialog({
     try {
       // Remove ss:// prefix
       const cleaned = link.replace(/^ss:\/\//, "");
-      
+
       // Try SIP002 format first: ss://cipher:password@host:port
       if (cleaned.includes("@")) {
         const [credentials, hostPort] = cleaned.split("@");
         const [cipher, password] = credentials.split(":");
         const [host, portStr] = hostPort.split(":");
-        
+
         if (cipher && password && host && portStr) {
           setFormData({
             ...formData,
@@ -78,14 +78,14 @@ export function ProxyFormDialog({
           return;
         }
       }
-      
+
       // Try legacy Base64 format: ss://base64(cipher:password)@host:port
       if (cleaned.includes("@")) {
         const [base64Part, hostPort] = cleaned.split("@");
         const decoded = atob(base64Part);
         const [cipher, password] = decoded.split(":");
         const [host, portStr] = hostPort.split(":");
-        
+
         if (cipher && password && host && portStr) {
           setFormData({
             ...formData,
@@ -99,7 +99,7 @@ export function ProxyFormDialog({
           return;
         }
       }
-      
+
       toast.error("Invalid Shadowsocks link format");
     } catch (error) {
       console.error("Failed to parse Shadowsocks link:", error);
@@ -233,11 +233,15 @@ export function ProxyFormDialog({
                 <SelectValue placeholder="Select proxy type" />
               </SelectTrigger>
               <SelectContent>
-                {["http", "https", "socks4", "socks5", "shadowsocks"].map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type === "shadowsocks" ? "Shadowsocks" : type.toUpperCase()}
-                  </SelectItem>
-                ))}
+                {["http", "https", "socks4", "socks5", "shadowsocks"].map(
+                  (type) => (
+                    <SelectItem key={type} value={type}>
+                      {type === "shadowsocks"
+                        ? "Shadowsocks"
+                        : type.toUpperCase()}
+                    </SelectItem>
+                  ),
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -305,7 +309,9 @@ export function ProxyFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="proxy-username">
-                {formData.proxy_type === "shadowsocks" ? "Cipher Method" : "Username (optional)"}
+                {formData.proxy_type === "shadowsocks"
+                  ? "Cipher Method"
+                  : "Username (optional)"}
               </Label>
               <Input
                 id="proxy-username"

@@ -383,16 +383,16 @@ async fn connect_via_shadowsocks(
   target_host: &str,
   target_port: u16,
 ) -> Result<TcpStream, Box<dyn std::error::Error>> {
-  use shadowsocks::config::{ServerConfig, ServerType};
+  use shadowsocks::config::ServerConfig;
   use shadowsocks::crypto::CipherKind;
   use shadowsocks::relay::socks5::Address;
-  use shadowsocks::{ProxyClientStream, ProxySocket};
+  use shadowsocks::ProxyClientStream;
 
   // Parse Shadowsocks configuration from URL
-  // Format: ss://cipher:password@host:port or ss://base64@host:port
+  // Format: ss://cipher:password@host:port
   let host = upstream.host_str().ok_or("Missing host")?;
   let port = upstream.port().ok_or("Missing port")?;
-  
+
   // Extract cipher method and password
   let (cipher_str, password) = if !upstream.username().is_empty() {
     // Format: ss://cipher:password@host:port
@@ -411,9 +411,9 @@ async fn connect_via_shadowsocks(
   let server_addr = format!("{}:{}", host, port).parse()?;
   let server_config = ServerConfig::new(server_addr, password.to_string(), cipher_kind);
 
-  // Create proxy socket
+  // Connect to the Shadowsocks server
   let stream = TcpStream::connect(&server_addr).await?;
-  
+
   // Create target address
   let target_addr = if let Ok(ip) = target_host.parse::<std::net::IpAddr>() {
     Address::SocketAddress(std::net::SocketAddr::new(ip, target_port))
@@ -422,11 +422,7 @@ async fn connect_via_shadowsocks(
   };
 
   // Connect through Shadowsocks proxy
-  let proxy_stream = ProxyClientStream::from_stream(
-    stream,
-    &server_config,
-    target_addr,
-  );
+  let proxy_stream = ProxyClientStream::from_stream(&server_config, stream, &target_addr);
 
   let connected_stream = proxy_stream.await?;
   Ok(connected_stream)
