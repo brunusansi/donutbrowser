@@ -389,6 +389,7 @@ async fn connect_via_shadowsocks(
   use shadowsocks::context::Context;
   use shadowsocks::crypto::CipherKind;
   use shadowsocks::relay::socks5::Address;
+  use shadowsocks::ServerType;
   use shadowsocks::ProxyClientStream;
 
   // Parse Shadowsocks configuration from URL
@@ -412,10 +413,10 @@ async fn connect_via_shadowsocks(
 
   // Create server configuration
   let server_addr = format!("{}:{}", host, port).parse()?;
-  let server_config = ServerConfig::new(server_addr, password.to_string(), cipher_kind);
+  let server_config = ServerConfig::new(server_addr, password.to_string(), cipher_kind)?;
 
-  // Create shared context for shadowsocks
-  let context = Context::new_shared(Default::default());
+  // Create shared context for shadowsocks (use ServerType::Local for client-side)
+  let context = Context::new_shared(ServerType::Local);
 
   // Connect to the Shadowsocks server to validate the connection
   let stream = TcpStream::connect(&server_addr).await?;
