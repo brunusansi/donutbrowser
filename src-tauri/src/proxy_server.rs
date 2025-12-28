@@ -386,6 +386,7 @@ async fn connect_via_shadowsocks(
   target_port: u16,
 ) -> Result<TcpStream, Box<dyn std::error::Error>> {
   use shadowsocks::config::ServerConfig;
+  use shadowsocks::context::{Context, SharedContext};
   use shadowsocks::crypto::CipherKind;
   use shadowsocks::relay::socks5::Address;
   use shadowsocks::ProxyClientStream;
@@ -413,6 +414,9 @@ async fn connect_via_shadowsocks(
   let server_addr = format!("{}:{}", host, port).parse()?;
   let server_config = ServerConfig::new(server_addr, password.to_string(), cipher_kind);
 
+  // Create shared context for shadowsocks
+  let context = Context::new_shared(Default::default());
+
   // Connect to the Shadowsocks server
   let stream = TcpStream::connect(&server_addr).await?;
 
@@ -424,7 +428,7 @@ async fn connect_via_shadowsocks(
   };
 
   // Connect through Shadowsocks proxy
-  let proxy_stream = ProxyClientStream::from_stream(&server_config, stream, &target_addr);
+  let proxy_stream = ProxyClientStream::from_stream(context, stream, &server_config, &target_addr);
 
   let connected_stream = proxy_stream.await?;
   Ok(connected_stream)
