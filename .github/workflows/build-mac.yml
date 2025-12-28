@@ -1,3 +1,4 @@
+# Build and verify macOS application for both Apple Silicon and Intel architectures
 name: Build macOS
 
 on:
