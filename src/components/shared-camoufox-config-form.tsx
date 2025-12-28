@@ -248,8 +248,11 @@ export function SharedCamoufoxConfigForm({
           <Label>Apple Silicon Preset (Optional)</Label>
           <Select
             value={config.hardwarePreset || "none"}
-            onValueChange={(value) => 
-              onConfigChange("hardwarePreset", value === "none" ? undefined : value)
+            onValueChange={(value) =>
+              onConfigChange(
+                "hardwarePreset",
+                value === "none" ? undefined : value,
+              )
             }
             disabled={readOnly}
           >
@@ -261,11 +264,15 @@ export function SharedCamoufoxConfigForm({
               <SelectItem value="M1">M1 (8 cores, 8GB)</SelectItem>
               <SelectItem value="M1-Pro">M1 Pro (10 cores, 16GB)</SelectItem>
               <SelectItem value="M1-Max">M1 Max (10 cores, 32GB)</SelectItem>
-              <SelectItem value="M1-Ultra">M1 Ultra (20 cores, 64GB)</SelectItem>
+              <SelectItem value="M1-Ultra">
+                M1 Ultra (20 cores, 64GB)
+              </SelectItem>
               <SelectItem value="M2">M2 (8 cores, 8GB)</SelectItem>
               <SelectItem value="M2-Pro">M2 Pro (12 cores, 16GB)</SelectItem>
               <SelectItem value="M2-Max">M2 Max (12 cores, 32GB)</SelectItem>
-              <SelectItem value="M2-Ultra">M2 Ultra (24 cores, 64GB)</SelectItem>
+              <SelectItem value="M2-Ultra">
+                M2 Ultra (24 cores, 64GB)
+              </SelectItem>
               <SelectItem value="M3">M3 (8 cores, 8GB)</SelectItem>
               <SelectItem value="M3-Pro">M3 Pro (12 cores, 18GB)</SelectItem>
               <SelectItem value="M3-Max">M3 Max (16 cores, 36GB)</SelectItem>
@@ -275,8 +282,9 @@ export function SharedCamoufoxConfigForm({
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            Select a specific Apple Silicon chipset to force consistent hardware fingerprinting. 
-            This ensures GPU renderer, CPU cores, memory, and screen dimensions match the selected chipset.
+            Select a specific Apple Silicon chipset to force consistent hardware
+            fingerprinting. This ensures GPU renderer, CPU cores, memory, and
+            screen dimensions match the selected chipset.
           </p>
         </div>
       )}
