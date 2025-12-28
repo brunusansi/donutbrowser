@@ -10,6 +10,7 @@ import {
   listCamoufoxConfigs,
   saveCamoufoxConfig,
 } from "./camoufox-storage.js";
+import { getHardwarePreset } from "./presets/apple-silicon.js";
 
 /**
  * Convert camoufox fingerprint format to fingerprint-generator format
@@ -405,6 +406,7 @@ interface GenerateConfigOptions {
   executablePath?: string;
   fingerprint?: string;
   os?: "windows" | "macos" | "linux";
+  hardwarePreset?: string;
 }
 
 /**
@@ -510,8 +512,31 @@ export async function generateCamoufoxConfig(
       throw new Error("No configuration generated");
     }
 
-    // Parse and return the config as JSON string
+    // Parse the config
     const config = JSON.parse(configStr);
+
+    // Apply hardware preset if specified
+    if (options.hardwarePreset) {
+      const preset = getHardwarePreset(options.hardwarePreset);
+      if (preset) {
+        // Force GPU renderer and vendor
+        config["webGl:renderer"] = preset.renderer;
+        config["webGl:vendor"] = preset.vendor;
+        
+        // Force hardware concurrency (CPU cores)
+        config["navigator.hardwareConcurrency"] = preset.cores;
+        
+        // Force memory (stored in GB, deviceMemory is also in GB)
+        config["navigator.deviceMemory"] = preset.memory;
+        
+        // Force screen dimensions
+        config["screen.width"] = preset.screen.width;
+        config["screen.height"] = preset.screen.height;
+        config["screen.availWidth"] = preset.screen.width;
+        config["screen.availHeight"] = preset.screen.height - 25; // Account for menu bar
+      }
+    }
+
     return JSON.stringify(config);
   } catch (error) {
     throw new Error(`Failed to generate Camoufox config: ${error}`);

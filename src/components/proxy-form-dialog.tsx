@@ -52,6 +52,60 @@ export function ProxyFormDialog({
     username: "",
     password: "",
   });
+  const [ssLink, setSsLink] = useState("");
+
+  const parseShadowsocksLink = (link: string) => {
+    try {
+      // Remove ss:// prefix
+      const cleaned = link.replace(/^ss:\/\//, "");
+      
+      // Try SIP002 format first: ss://cipher:password@host:port
+      if (cleaned.includes("@")) {
+        const [credentials, hostPort] = cleaned.split("@");
+        const [cipher, password] = credentials.split(":");
+        const [host, portStr] = hostPort.split(":");
+        
+        if (cipher && password && host && portStr) {
+          setFormData({
+            ...formData,
+            proxy_type: "shadowsocks",
+            host: host,
+            port: parseInt(portStr, 10) || 8388,
+            username: decodeURIComponent(cipher), // cipher method
+            password: decodeURIComponent(password),
+          });
+          toast.success("Shadowsocks link parsed successfully");
+          return;
+        }
+      }
+      
+      // Try legacy Base64 format: ss://base64(cipher:password)@host:port
+      if (cleaned.includes("@")) {
+        const [base64Part, hostPort] = cleaned.split("@");
+        const decoded = atob(base64Part);
+        const [cipher, password] = decoded.split(":");
+        const [host, portStr] = hostPort.split(":");
+        
+        if (cipher && password && host && portStr) {
+          setFormData({
+            ...formData,
+            proxy_type: "shadowsocks",
+            host: host,
+            port: parseInt(portStr, 10) || 8388,
+            username: cipher, // cipher method
+            password: password,
+          });
+          toast.success("Shadowsocks link parsed successfully (legacy format)");
+          return;
+        }
+      }
+      
+      toast.error("Invalid Shadowsocks link format");
+    } catch (error) {
+      console.error("Failed to parse Shadowsocks link:", error);
+      toast.error("Failed to parse Shadowsocks link");
+    }
+  };
 
   const resetForm = useCallback(() => {
     setFormData({
@@ -179,14 +233,40 @@ export function ProxyFormDialog({
                 <SelectValue placeholder="Select proxy type" />
               </SelectTrigger>
               <SelectContent>
-                {["http", "https", "socks4", "socks5"].map((type) => (
+                {["http", "https", "socks4", "socks5", "shadowsocks"].map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type.toUpperCase()}
+                    {type === "shadowsocks" ? "Shadowsocks" : type.toUpperCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {formData.proxy_type === "shadowsocks" && (
+            <div className="grid gap-2">
+              <Label htmlFor="ss-link">Shadowsocks Link (Optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="ss-link"
+                  value={ssLink}
+                  onChange={(e) => setSsLink(e.target.value)}
+                  placeholder="ss://..."
+                  disabled={isSubmitting}
+                />
+                <RippleButton
+                  variant="outline"
+                  onClick={() => {
+                    if (ssLink.trim()) {
+                      parseShadowsocksLink(ssLink.trim());
+                    }
+                  }}
+                  disabled={isSubmitting || !ssLink.trim()}
+                >
+                  Parse
+                </RippleButton>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
@@ -224,7 +304,9 @@ export function ProxyFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="proxy-username">Username (optional)</Label>
+              <Label htmlFor="proxy-username">
+                {formData.proxy_type === "shadowsocks" ? "Cipher Method" : "Username (optional)"}
+              </Label>
               <Input
                 id="proxy-username"
                 value={formData.username}
@@ -234,7 +316,11 @@ export function ProxyFormDialog({
                     username: e.target.value,
                   })
                 }
-                placeholder="Proxy username"
+                placeholder={
+                  formData.proxy_type === "shadowsocks"
+                    ? "e.g. aes-256-gcm, chacha20-ietf-poly1305"
+                    : "Proxy username"
+                }
                 disabled={isSubmitting}
               />
             </div>
