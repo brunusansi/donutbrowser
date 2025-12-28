@@ -77,25 +77,28 @@ export function ProxyFormDialog({
           toast.success("Shadowsocks link parsed successfully");
           return;
         }
-      }
 
-      // Try legacy Base64 format: ss://base64(cipher:password)@host:port
-      if (cleaned.includes("@")) {
-        const [base64Part, hostPort] = cleaned.split("@");
-        const decoded = atob(base64Part);
-        const [cipher, password] = decoded.split(":");
-        const [host, portStr] = hostPort.split(":");
+        // Try legacy Base64 format: ss://base64(cipher:password)@host:port
+        try {
+          const decoded = atob(credentials);
+          const [decodedCipher, decodedPassword] = decoded.split(":");
 
-        if (cipher && password && host && portStr) {
-          setFormData({
-            ...formData,
-            proxy_type: "shadowsocks",
-            host: host,
-            port: parseInt(portStr, 10) || 8388,
-            username: cipher, // cipher method
-            password: password,
-          });
-          toast.success("Shadowsocks link parsed successfully (legacy format)");
+          if (decodedCipher && decodedPassword && host && portStr) {
+            setFormData({
+              ...formData,
+              proxy_type: "shadowsocks",
+              host: host,
+              port: parseInt(portStr, 10) || 8388,
+              username: decodedCipher, // cipher method
+              password: decodedPassword,
+            });
+            toast.success(
+              "Shadowsocks link parsed successfully (legacy format)",
+            );
+            return;
+          }
+        } catch (_base64Error) {
+          toast.error("Invalid Base64 encoding in Shadowsocks link");
           return;
         }
       }

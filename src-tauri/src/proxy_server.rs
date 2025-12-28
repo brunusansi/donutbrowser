@@ -255,6 +255,8 @@ async fn handle_connect(
       }
       "ss" | "shadowsocks" => {
         // Use shadowsocks for SS proxies
+        // Note: Like SOCKS, the stream is validated here but actual tunneling
+        // happens in the HTTP/1 upgrade flow after returning 200 OK
         match connect_via_shadowsocks(&upstream, target_host, target_port).await {
           Ok(_stream) => {
             let mut response = Response::new(Full::new(Bytes::from("")));
