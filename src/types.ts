@@ -1,5 +1,5 @@
 export interface ProxySettings {
-  proxy_type: string; // "http", "https", "socks4", or "socks5"
+  proxy_type: string; // "http", "https", "socks4", "socks5", or "shadowsocks"
   host: string;
   port: number;
   username?: string;
@@ -99,6 +99,7 @@ export interface CamoufoxConfig {
   fingerprint?: string; // JSON string of the complete fingerprint config
   randomize_fingerprint_on_launch?: boolean; // Generate new fingerprint on every launch
   os?: CamoufoxOS; // Operating system for fingerprint generation
+  hardwarePreset?: string; // Hardware preset for Apple Silicon (e.g., "M1", "M2-Pro")
 }
 
 // Extended interface for the advanced fingerprint configuration
