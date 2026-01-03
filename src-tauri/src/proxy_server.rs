@@ -385,15 +385,13 @@ async fn connect_via_shadowsocks(
   _target_host: &str,
   _target_port: u16,
 ) -> Result<TcpStream, Box<dyn std::error::Error>> {
-  // Shadowsocks support requires a different stream type (ProxyClientStream)
-  // which is not compatible with our TcpStream-based tunneling.
-  // This feature is planned for a future release with proper stream abstraction.
-  //
-  // For now, return an error indicating this proxy type is not yet supported.
-  Err(format!(
-    "Shadowsocks proxy type is not yet fully supported. URL: {}",
-    upstream
-  ).into())
+  Err(
+    format!(
+      "Shadowsocks proxy type is not yet fully supported. URL: {}",
+      upstream
+    )
+    .into(),
+  )
 }
 
 async fn handle_http_via_socks4(
