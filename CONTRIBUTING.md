@@ -114,6 +114,46 @@ pnpm tauri build
 
 Make sure the build completes successfully without errors.
 
+## Cross-Compilation for macOS
+
+The project supports building for both Intel (x86_64) and Apple Silicon (ARM64) architectures on macOS.
+
+### Architecture-Specific Builds
+
+The `nodecar` sidecar binary can be built for specific architectures using platform-specific build scripts:
+
+```bash
+cd nodecar
+
+# For Apple Silicon (ARM64)
+pnpm run build:mac-aarch64
+
+# For Intel (x86_64)
+pnpm run build:mac-x86_64
+```
+
+These scripts use the `--arch` flag with `banderole` to specify the target architecture:
+- `--arch arm64` for Apple Silicon M-series chips
+- `--arch x64` for Intel processors
+
+### How It Works
+
+The build process uses [banderole](https://github.com/zhom/banderole), a Node.js bundler that creates portable single-executable binaries. When the `--arch` flag is specified:
+
+1. Banderole downloads the correct Node.js binary for the target architecture
+2. It bundles your TypeScript code (compiled to JavaScript) with the Node.js runtime
+3. The resulting binary can run natively on the target architecture
+
+This allows cross-compilation on macOS, meaning you can build x86_64 binaries on an ARM64 Mac and vice versa, which is essential for creating universal releases that work on both architectures.
+
+### Why This Matters
+
+Previously, the build scripts didn't specify the target architecture, causing banderole to default to the host machine's architecture. This meant:
+- Building on ARM64 (M-series) Macs would always produce ARM64 binaries, even for the `build:mac-x86_64` target
+- Intel Mac users couldn't run the application built on ARM64 machines
+
+With explicit `--arch` flags, the build system correctly produces binaries for both architectures from a single build machine.
+
 ## Testing
 
 - Always test your changes on the target platform
