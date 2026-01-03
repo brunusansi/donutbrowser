@@ -66,6 +66,8 @@ After having the above dependencies installed, proceed through the following ste
    pnpm build
    ```
 
+   **Note:** The `pnpm build` command builds for your current machine's architecture. For cross-compilation or building for specific architectures, see the [Cross-Compilation for macOS](#cross-compilation-for-macos) section below.
+
 5. **Start the development server**
 
    ```bash
@@ -117,6 +119,11 @@ Make sure the build completes successfully without errors.
 ## Cross-Compilation for macOS
 
 The project supports building for both Intel (x86_64) and Apple Silicon (ARM64) architectures on macOS.
+
+### Local Development vs. Cross-Compilation
+
+- **Local Development**: Use `pnpm build` in the nodecar directory. This builds for your current machine's architecture automatically.
+- **Cross-Compilation**: Use platform-specific scripts (e.g., `build:mac-x86_64`) to build for a different architecture than your host machine.
 
 ### Architecture-Specific Builds
 
