@@ -1330,6 +1330,7 @@ mod tests {
       port: 8080,
       username: Some("user".to_string()),
       password: Some("pass".to_string()),
+      xray_url: None,
     };
 
     let result = manager.apply_proxy_settings_to_profile(&profile_dir, &proxy_settings, None);

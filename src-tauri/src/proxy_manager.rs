@@ -434,6 +434,68 @@ impl ProxyManager {
       .map(|p| p.proxy_settings.clone())
   }
 
+  // Check if a proxy type is an Xray protocol
+  fn is_xray_protocol(proxy_type: &str) -> bool {
+    matches!(
+      proxy_type.to_lowercase().as_str(),
+      "vmess" | "vless" | "trojan" | "shadowsocks" | "ss"
+    )
+  }
+
+  // Start an Xray proxy for advanced protocols
+  async fn start_xray_proxy(
+    &self,
+    proxy_settings: &ProxySettings,
+    browser_pid: u32,
+    profile_id: Option<&str>,
+  ) -> Result<ProxySettings, String> {
+    use crate::xray_manager::XRAY_MANAGER;
+
+    // Get the Xray URL from proxy settings
+    let xray_url = proxy_settings
+      .xray_url
+      .as_ref()
+      .ok_or_else(|| "Xray URL is required for Xray protocols".to_string())?;
+
+    // Start Xray instance
+    let instance = XRAY_MANAGER.start_from_url(xray_url).await?;
+
+    // Store the proxy info
+    let proxy_info = ProxyInfo {
+      id: instance.id.clone(),
+      local_url: format!("socks5://127.0.0.1:{}", instance.local_socks_port),
+      upstream_host: instance.config.address.clone(),
+      upstream_port: instance.config.port,
+      upstream_type: instance.config.protocol.to_string(),
+      local_port: instance.local_socks_port,
+      profile_id: profile_id.map(|s| s.to_string()),
+    };
+
+    {
+      let mut proxies = self.active_proxies.lock().unwrap();
+      proxies.insert(browser_pid, proxy_info.clone());
+    }
+
+    // Store the profile proxy info for persistence
+    if let Some(id) = profile_id {
+      let mut profile_proxies = self.profile_proxies.lock().unwrap();
+      profile_proxies.insert(id.to_string(), proxy_settings.clone());
+
+      let mut map = self.profile_active_proxy_ids.lock().unwrap();
+      map.insert(id.to_string(), instance.id.clone());
+    }
+
+    // Return SOCKS5 proxy settings for the browser to use
+    Ok(ProxySettings {
+      proxy_type: "socks5".to_string(),
+      host: "127.0.0.1".to_string(),
+      port: instance.local_socks_port,
+      username: None,
+      password: None,
+      xray_url: None,
+    })
+  }
+
   // Build proxy URL string from ProxySettings
   fn build_proxy_url(proxy_settings: &ProxySettings) -> String {
     let mut url = format!("{}://", proxy_settings.proxy_type);
@@ -632,6 +694,7 @@ impl ProxyManager {
                 port: existing.local_port,
                 username: None,
                 password: None,
+                xray_url: None,
               });
             }
             // Need to add this PID to the mapping - we'll do that after starting
@@ -672,6 +735,7 @@ impl ProxyManager {
               port: existing.local_port,
               username: None,
               password: None,
+              xray_url: None,
             });
           }
           // Profile ID changed - we'll create a new proxy but don't stop the old one
@@ -679,6 +743,15 @@ impl ProxyManager {
         }
         // Upstream changed - we'll create a new proxy but don't stop the old one
         // It will be cleaned up by periodic cleanup if it becomes dead
+      }
+    }
+
+    // Check if this is an Xray protocol (vmess, vless, trojan, shadowsocks)
+    if let Some(proxy_settings) = proxy_settings {
+      if Self::is_xray_protocol(&proxy_settings.proxy_type) {
+        return self
+          .start_xray_proxy(proxy_settings, browser_pid, profile_id)
+          .await;
       }
     }
 
@@ -809,6 +882,7 @@ impl ProxyManager {
       port: proxy_info.local_port,
       username: None,
       password: None,
+      xray_url: None,
     })
   }
 
@@ -1119,6 +1193,7 @@ mod tests {
       port: 8080,
       username: Some("user".to_string()),
       password: Some("pass".to_string()),
+      xray_url: None,
     };
 
     assert!(
@@ -1146,6 +1221,7 @@ mod tests {
       port: 0,
       username: None,
       password: None,
+      xray_url: None,
     };
 
     assert!(
@@ -1299,6 +1375,7 @@ mod tests {
       port: 8080,
       username: Some("user".to_string()),
       password: Some("pass".to_string()),
+      xray_url: None,
     };
 
     // Test command arguments match expected format

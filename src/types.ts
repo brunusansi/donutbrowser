@@ -1,9 +1,10 @@
 export interface ProxySettings {
-  proxy_type: string; // "http", "https", "socks4", "socks5", or "shadowsocks"
+  proxy_type: string; // "http", "https", "socks4", "socks5", "vmess", "vless", "trojan", or "shadowsocks"
   host: string;
   port: number;
   username?: string;
   password?: string;
+  xray_url?: string; // For Xray protocols (vmess, vless, trojan, shadowsocks), the full proxy URL
 }
 
 export interface TableSortingSettings {

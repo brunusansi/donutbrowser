@@ -34,6 +34,9 @@ pub mod traffic_stats;
 // mod theme_detector; // removed: theme detection handled in webview via CSS prefers-color-scheme
 mod tag_manager;
 mod version_updater;
+mod xray_config_generator;
+pub mod xray_manager;
+pub mod xray_protocol_parser;
 
 use browser_runner::{
   check_browser_exists, kill_browser_profile, launch_browser_profile, open_url_with_profile,

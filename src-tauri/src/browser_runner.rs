@@ -759,6 +759,7 @@ impl BrowserRunner {
           port: internal_proxy.port,
           username: None,
           password: None,
+          xray_url: None,
         };
 
         self
@@ -1880,6 +1881,7 @@ pub async fn launch_browser_profile(
             port: internal_proxy.port,
             username: None,
             password: None,
+            xray_url: None,
           };
 
           browser_runner

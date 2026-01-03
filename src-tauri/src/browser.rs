@@ -4,11 +4,15 @@ use utoipa::ToSchema;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProxySettings {
-  pub proxy_type: String, // "http", "https", "socks4", or "socks5"
+  pub proxy_type: String, // "http", "https", "socks4", "socks5", "vmess", "vless", "trojan", "shadowsocks"
   pub host: String,
   pub port: u16,
   pub username: Option<String>,
   pub password: Option<String>,
+  /// For Xray protocols (vmess, vless, trojan, shadowsocks), this contains the full proxy URL
+  /// that will be parsed and used to generate Xray configuration
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub xray_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1228,6 +1232,7 @@ mod tests {
       port: 8080,
       username: None,
       password: None,
+      xray_url: None,
     };
 
     assert_eq!(proxy.proxy_type, "http");
@@ -1241,6 +1246,7 @@ mod tests {
       port: 1080,
       username: None,
       password: None,
+      xray_url: None,
     };
 
     assert_eq!(socks_proxy.proxy_type, "socks5");
@@ -1387,6 +1393,7 @@ mod tests {
       port: 8080,
       username: None,
       password: None,
+      xray_url: None,
     };
 
     // Test that it can be serialized (implements Serialize)
