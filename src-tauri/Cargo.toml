@@ -74,7 +74,6 @@ hyper-util = { version = "0.1", features = ["full"] }
 http-body-util = "0.1"
 clap = { version = "4", features = ["derive"] }
 async-socks5 = "0.6"
-shadowsocks = "1.21"
 
 [target."cfg(any(target_os = \"macos\", windows, target_os = \"linux\"))".dependencies]
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

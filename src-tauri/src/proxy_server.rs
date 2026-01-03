@@ -382,52 +382,18 @@ async fn connect_via_socks(
 
 async fn connect_via_shadowsocks(
   upstream: &Url,
-  target_host: &str,
-  target_port: u16,
+  _target_host: &str,
+  _target_port: u16,
 ) -> Result<TcpStream, Box<dyn std::error::Error>> {
-  use shadowsocks::config::ServerConfig;
-  use shadowsocks::crypto::CipherKind;
-  use shadowsocks::relay::socks5::Address;
-  use shadowsocks::ProxyClientStream;
-
-  // Parse Shadowsocks configuration from URL
-  // Format: ss://cipher:password@host:port
-  let host = upstream.host_str().ok_or("Missing host")?;
-  let port = upstream.port().ok_or("Missing port")?;
-
-  // Extract cipher method and password
-  let (cipher_str, password) = if !upstream.username().is_empty() {
-    // Format: ss://cipher:password@host:port
-    (upstream.username(), upstream.password().unwrap_or(""))
-  } else {
-    // Try to parse from path or query if not in username
-    return Err("Shadowsocks credentials not properly formatted".into());
-  };
-
-  // Parse cipher kind
-  let cipher_kind = cipher_str
-    .parse::<CipherKind>()
-    .map_err(|_| format!("Unsupported cipher method: {}", cipher_str))?;
-
-  // Create server configuration
-  let server_addr = format!("{}:{}", host, port).parse()?;
-  let server_config = ServerConfig::new(server_addr, password.to_string(), cipher_kind);
-
-  // Connect to the Shadowsocks server
-  let stream = TcpStream::connect(&server_addr).await?;
-
-  // Create target address
-  let target_addr = if let Ok(ip) = target_host.parse::<std::net::IpAddr>() {
-    Address::SocketAddress(std::net::SocketAddr::new(ip, target_port))
-  } else {
-    Address::DomainNameAddress(target_host.to_string(), target_port)
-  };
-
-  // Connect through Shadowsocks proxy
-  let proxy_stream = ProxyClientStream::from_stream(&server_config, stream, &target_addr);
-
-  let connected_stream = proxy_stream.await?;
-  Ok(connected_stream)
+  // Shadowsocks support requires a different stream type (ProxyClientStream)
+  // which is not compatible with our TcpStream-based tunneling.
+  // This feature is planned for a future release with proper stream abstraction.
+  //
+  // For now, return an error indicating this proxy type is not yet supported.
+  Err(format!(
+    "Shadowsocks proxy type is not yet fully supported. URL: {}",
+    upstream
+  ).into())
 }
 
 async fn handle_http_via_socks4(
