@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::Mutex;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
+use tauri::AppHandle;
+use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::ShellExt;
 
 /// Information about a running Xray instance
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ pub struct XrayInstance {
 /// Manager for Xray-core instances
 pub struct XrayManager {
   instances: Mutex<HashMap<String, XrayInstance>>,
-  processes: Mutex<HashMap<String, Child>>,
+  processes: Mutex<HashMap<String, CommandChild>>,
   base_dirs: BaseDirs,
 }
 
@@ -56,23 +56,6 @@ impl XrayManager {
     self.get_xray_dir().join("configs")
   }
 
-  /// Get the Xray binary path based on platform
-  pub fn get_xray_binary_path(&self) -> PathBuf {
-    let xray_dir = self.get_xray_dir();
-
-    #[cfg(target_os = "windows")]
-    let binary_name = "xray.exe";
-    #[cfg(not(target_os = "windows"))]
-    let binary_name = "xray";
-
-    xray_dir.join("bin").join(binary_name)
-  }
-
-  /// Check if Xray binary is available
-  pub fn is_xray_available(&self) -> bool {
-    self.get_xray_binary_path().exists()
-  }
-
   /// Find an available port for Xray local proxy
   async fn find_available_port(&self, start_port: u16) -> Result<u16, String> {
     use tokio::net::TcpListener;
@@ -89,17 +72,21 @@ impl XrayManager {
   }
 
   /// Start an Xray instance from a proxy URL
-  pub async fn start_from_url(&self, url: &str) -> Result<XrayInstance, String> {
+  pub async fn start_from_url(
+    &self,
+    app_handle: &AppHandle,
+    url: &str,
+  ) -> Result<XrayInstance, String> {
     let config = parse_proxy_url(url)?;
-    self.start_instance(config).await
+    self.start_instance(app_handle, config).await
   }
 
   /// Start an Xray instance with the given configuration
-  pub async fn start_instance(&self, config: XrayProxyConfig) -> Result<XrayInstance, String> {
-    if !self.is_xray_available() {
-      return Err("Xray binary not found. Please ensure Xray-core is installed.".to_string());
-    }
-
+  pub async fn start_instance(
+    &self,
+    app_handle: &AppHandle,
+    config: XrayProxyConfig,
+  ) -> Result<XrayInstance, String> {
     // Generate unique ID for this instance
     let instance_id = format!(
       "xray_{}_{}",
@@ -129,50 +116,66 @@ impl XrayManager {
     fs::write(&config_path, &config_json)
       .map_err(|e| format!("Failed to write Xray config: {}", e))?;
 
-    // Start Xray process
-    let xray_binary = self.get_xray_binary_path();
-    let mut child = Command::new(&xray_binary)
+    // Start Xray process using Tauri sidecar
+    let sidecar_cmd = app_handle
+      .shell()
+      .sidecar("xray")
+      .map_err(|e| format!("Failed to create Xray sidecar: {}", e))?
       .arg("run")
       .arg("-config")
-      .arg(&config_path)
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .kill_on_drop(true)
+      .arg(config_path.to_string_lossy().to_string());
+
+    let (mut rx, child) = sidecar_cmd
       .spawn()
-      .map_err(|e| format!("Failed to start Xray process: {}", e))?;
+      .map_err(|e| format!("Failed to spawn Xray process: {}", e))?;
 
-    let pid = child.id();
+    let pid = child.pid();
 
-    // Wait for Xray to start and check for errors
-    let stderr = child.stderr.take();
-    if let Some(stderr) = stderr {
-      let mut reader = BufReader::new(stderr).lines();
-
-      // Read first few lines to check for startup errors
-      let timeout = tokio::time::timeout(std::time::Duration::from_secs(3), async {
-        while let Ok(Some(line)) = reader.next_line().await {
-          log::debug!("Xray[{}]: {}", instance_id, line);
-          if line.contains("started") || line.contains("listening") {
-            return Ok(());
+    // Wait for Xray to start by checking stderr/stdout for startup messages
+    let instance_id_clone = instance_id.clone();
+    let startup_check = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+      use tauri_plugin_shell::process::CommandEvent;
+      while let Some(event) = rx.recv().await {
+        match event {
+          CommandEvent::Stdout(line) => {
+            let line_str = String::from_utf8_lossy(&line);
+            log::debug!("Xray[{}] stdout: {}", instance_id_clone, line_str);
+            if line_str.contains("started") || line_str.contains("listening") {
+              return Ok(());
+            }
           }
-          if line.contains("error") || line.contains("failed") {
-            return Err(format!("Xray startup error: {}", line));
+          CommandEvent::Stderr(line) => {
+            let line_str = String::from_utf8_lossy(&line);
+            log::debug!("Xray[{}] stderr: {}", instance_id_clone, line_str);
+            if line_str.contains("error") || line_str.contains("failed") {
+              return Err(format!("Xray startup error: {}", line_str));
+            }
+            if line_str.contains("started") || line_str.contains("listening") {
+              return Ok(());
+            }
           }
+          CommandEvent::Error(err) => {
+            return Err(format!("Xray error: {}", err));
+          }
+          CommandEvent::Terminated(_) => {
+            return Err("Xray process terminated unexpectedly".to_string());
+          }
+          _ => {}
         }
-        Ok(())
-      })
-      .await;
+      }
+      Ok(())
+    })
+    .await;
 
-      match timeout {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => {
-          let _ = child.kill().await;
-          let _ = fs::remove_file(&config_path);
-          return Err(e);
-        }
-        Err(_) => {
-          // Timeout is okay, Xray might not output anything on success
-        }
+    match startup_check {
+      Ok(Ok(())) => {}
+      Ok(Err(e)) => {
+        let _ = child.kill();
+        let _ = fs::remove_file(&config_path);
+        return Err(e);
+      }
+      Err(_) => {
+        // Timeout is okay, Xray might not output anything on success
       }
     }
 
@@ -184,7 +187,7 @@ impl XrayManager {
     match TcpStream::connect(format!("127.0.0.1:{}", socks_port)).await {
       Ok(_) => {}
       Err(_) => {
-        let _ = child.kill().await;
+        let _ = child.kill();
         let _ = fs::remove_file(&config_path);
         return Err(format!(
           "Xray failed to bind to port {}. Check if another process is using it.",
@@ -199,7 +202,7 @@ impl XrayManager {
       local_socks_port: socks_port,
       local_http_port: http_port,
       config_path: config_path.clone(),
-      pid,
+      pid: Some(pid),
     };
 
     // Store instance and process
@@ -222,15 +225,15 @@ impl XrayManager {
   }
 
   /// Stop an Xray instance by ID
-  pub async fn stop_instance(&self, instance_id: &str) -> Result<bool, String> {
+  pub fn stop_instance(&self, instance_id: &str) -> Result<bool, String> {
     // Remove and kill the process
-    let mut child = {
+    let child = {
       let mut processes = self.processes.lock().unwrap();
       processes.remove(instance_id)
     };
 
-    if let Some(ref mut child) = child {
-      let _ = child.kill().await;
+    if let Some(child) = child {
+      let _ = child.kill();
     }
 
     // Remove instance info and config file
@@ -249,14 +252,14 @@ impl XrayManager {
   }
 
   /// Stop all Xray instances
-  pub async fn stop_all(&self) -> Result<(), String> {
+  pub fn stop_all(&self) -> Result<(), String> {
     let instance_ids: Vec<String> = {
       let instances = self.instances.lock().unwrap();
       instances.keys().cloned().collect()
     };
 
     for id in instance_ids {
-      let _ = self.stop_instance(&id).await;
+      let _ = self.stop_instance(&id);
     }
 
     Ok(())
@@ -272,45 +275,6 @@ impl XrayManager {
   pub fn get_all_instances(&self) -> Vec<XrayInstance> {
     let instances = self.instances.lock().unwrap();
     instances.values().cloned().collect()
-  }
-
-  /// Check if an instance is still running
-  pub fn is_instance_running(&self, instance_id: &str) -> bool {
-    let processes = self.processes.lock().unwrap();
-    if let Some(child) = processes.get(instance_id) {
-      // Check if process is still running by trying to get its ID
-      child.id().is_some()
-    } else {
-      false
-    }
-  }
-
-  /// Clean up dead instances
-  pub async fn cleanup_dead_instances(&self) -> Vec<String> {
-    let mut dead_ids = Vec::new();
-
-    // Find dead instances
-    {
-      let processes = self.processes.lock().unwrap();
-      let instances = self.instances.lock().unwrap();
-
-      for (id, _instance) in instances.iter() {
-        if let Some(child) = processes.get(id) {
-          if child.id().is_none() {
-            dead_ids.push(id.clone());
-          }
-        } else {
-          dead_ids.push(id.clone());
-        }
-      }
-    }
-
-    // Clean up dead instances
-    for id in &dead_ids {
-      let _ = self.stop_instance(id).await;
-    }
-
-    dead_ids
   }
 }
 
@@ -332,21 +296,17 @@ mod tests {
   #[test]
   fn test_xray_manager_creation() {
     let manager = XrayManager::new();
-    assert!(!manager.is_xray_available()); // Binary won't be present in tests
+    let instances = manager.get_all_instances();
+    assert!(instances.is_empty());
   }
 
   #[test]
   fn test_xray_dir_paths() {
     let manager = XrayManager::new();
     let xray_dir = manager.get_xray_dir();
-    let binary_path = manager.get_xray_binary_path();
     let configs_dir = manager.get_configs_dir();
 
     assert!(xray_dir.ends_with("xray") || xray_dir.to_string_lossy().contains("xray"));
-    assert!(
-      binary_path.to_string_lossy().contains("xray")
-        || binary_path.to_string_lossy().contains("xray.exe")
-    );
     assert!(configs_dir.ends_with("configs"));
   }
 }

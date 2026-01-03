@@ -445,6 +445,7 @@ impl ProxyManager {
   // Start an Xray proxy for advanced protocols
   async fn start_xray_proxy(
     &self,
+    app_handle: &tauri::AppHandle,
     proxy_settings: &ProxySettings,
     browser_pid: u32,
     profile_id: Option<&str>,
@@ -458,7 +459,7 @@ impl ProxyManager {
       .ok_or_else(|| "Xray URL is required for Xray protocols".to_string())?;
 
     // Start Xray instance
-    let instance = XRAY_MANAGER.start_from_url(xray_url).await?;
+    let instance = XRAY_MANAGER.start_from_url(app_handle, xray_url).await?;
 
     // Store the proxy info
     let proxy_info = ProxyInfo {
@@ -750,7 +751,7 @@ impl ProxyManager {
     if let Some(proxy_settings) = proxy_settings {
       if Self::is_xray_protocol(&proxy_settings.proxy_type) {
         return self
-          .start_xray_proxy(proxy_settings, browser_pid, profile_id)
+          .start_xray_proxy(app_handle, proxy_settings, browser_pid, profile_id)
           .await;
       }
     }

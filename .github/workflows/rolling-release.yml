@@ -71,30 +71,35 @@ jobs:
             target: "aarch64-apple-darwin"
             pkg_target: "latest-macos-arm64"
             nodecar_script: "build:mac-aarch64"
+            xray_asset: "Xray-macos-arm64-v8a.zip"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin --verbose"
             arch: "x86_64"
             target: "x86_64-apple-darwin"
             pkg_target: "latest-macos-x64"
             nodecar_script: "build:mac-x86_64"
+            xray_asset: "Xray-macos-64.zip"
           - platform: "ubuntu-22.04"
             args: "--target x86_64-unknown-linux-gnu --verbose"
             arch: "x86_64"
             target: "x86_64-unknown-linux-gnu"
             pkg_target: "latest-linux-x64"
             nodecar_script: "build:linux-x64"
+            xray_asset: "Xray-linux-64.zip"
           - platform: "ubuntu-22.04-arm"
             args: "--target aarch64-unknown-linux-gnu --verbose"
             arch: "aarch64"
             target: "aarch64-unknown-linux-gnu"
             pkg_target: "latest-linux-arm64"
             nodecar_script: "build:linux-arm64"
+            xray_asset: "Xray-linux-arm64-v8a.zip"
           - platform: "windows-latest"
             args: "--target x86_64-pc-windows-msvc --verbose"
             arch: "x86_64"
             target: "x86_64-pc-windows-msvc"
             pkg_target: "latest-win-x64"
             nodecar_script: "build:win-x64"
+            xray_asset: "Xray-windows-64.zip"
           # - platform: "windows-11-arm"
           #   args: "--target aarch64-pc-windows-msvc --verbose"
           #   arch: "aarch64"
@@ -190,6 +195,32 @@ jobs:
             cp src-tauri/target/${{ matrix.target }}/release/donut-proxy src-tauri/binaries/donut-proxy-${{ matrix.target }}
             chmod +x src-tauri/binaries/donut-proxy-${{ matrix.target }}
           fi
+
+      - name: Download and extract Xray-core
+        shell: bash
+        run: |
+          XRAY_VERSION="v25.1.1"
+          XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${{ matrix.xray_asset }}"
+          
+          echo "Downloading Xray-core from: ${XRAY_URL}"
+          mkdir -p src-tauri/binaries/xray
+          curl -L -o xray.zip "${XRAY_URL}"
+          
+          # Extract based on platform
+          if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
+            unzip -o xray.zip -d src-tauri/binaries/xray
+            mv src-tauri/binaries/xray/xray.exe src-tauri/binaries/xray-${{ matrix.target }}.exe
+          else
+            unzip -o xray.zip -d src-tauri/binaries/xray
+            mv src-tauri/binaries/xray/xray src-tauri/binaries/xray-${{ matrix.target }}
+            chmod +x src-tauri/binaries/xray-${{ matrix.target }}
+          fi
+          
+          # Clean up
+          rm -rf xray.zip src-tauri/binaries/xray
+          
+          echo "Xray-core installed successfully"
+          ls -la src-tauri/binaries/
 
       - name: Generate nightly timestamp
         id: timestamp
