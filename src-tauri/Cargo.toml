@@ -136,7 +136,9 @@ incremental = true
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` points to the filesystem
-default = ["custom-protocol"]
+default = ["custom-protocol", "xray"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+# Xray-core integration (requires Tauri runtime)
+xray = []

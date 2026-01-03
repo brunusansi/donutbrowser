@@ -183,7 +183,7 @@ jobs:
       - name: Build donut-proxy sidecar
         shell: bash
         working-directory: ./src-tauri
-        run: cargo build --bin donut-proxy --target ${{ matrix.target }} --release
+        run: cargo build --bin donut-proxy --target ${{ matrix.target }} --release --no-default-features
 
       - name: Copy donut-proxy binary to Tauri binaries
         shell: bash

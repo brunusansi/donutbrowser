@@ -435,6 +435,7 @@ impl ProxyManager {
   }
 
   // Check if a proxy type is an Xray protocol
+  #[cfg(feature = "xray")]
   fn is_xray_protocol(proxy_type: &str) -> bool {
     matches!(
       proxy_type.to_lowercase().as_str(),
@@ -443,6 +444,7 @@ impl ProxyManager {
   }
 
   // Start an Xray proxy for advanced protocols
+  #[cfg(feature = "xray")]
   async fn start_xray_proxy(
     &self,
     app_handle: &tauri::AppHandle,
@@ -748,6 +750,7 @@ impl ProxyManager {
     }
 
     // Check if this is an Xray protocol (vmess, vless, trojan, shadowsocks)
+    #[cfg(feature = "xray")]
     if let Some(proxy_settings) = proxy_settings {
       if Self::is_xray_protocol(&proxy_settings.proxy_type) {
         return self

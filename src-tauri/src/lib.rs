@@ -35,6 +35,7 @@ pub mod traffic_stats;
 mod tag_manager;
 mod version_updater;
 mod xray_config_generator;
+#[cfg(feature = "xray")]
 pub mod xray_manager;
 pub mod xray_protocol_parser;
 

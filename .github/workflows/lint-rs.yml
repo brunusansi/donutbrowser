@@ -129,7 +129,7 @@ jobs:
       - name: Build donut-proxy sidecar
         shell: bash
         working-directory: ./src-tauri
-        run: cargo build --bin donut-proxy
+        run: cargo build --bin donut-proxy --no-default-features
 
       - name: Copy donut-proxy binary to Tauri binaries
         shell: bash
