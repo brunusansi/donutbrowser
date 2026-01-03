@@ -60,11 +60,22 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 #v2.8.2
+        with:
+          workdir: ./src-tauri
+
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        run: |
+          if ! command -v cargo-audit &> /dev/null; then
+            cargo install cargo-audit
+          fi
 
       - name: Install banderole
-        run: cargo install banderole
+        run: |
+          if ! command -v banderole &> /dev/null; then
+            cargo install banderole
+          fi
 
       - name: Install dependencies (Ubuntu only)
         if: matrix.os == 'ubuntu-22.04'
