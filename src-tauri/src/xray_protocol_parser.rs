@@ -325,9 +325,10 @@ fn parse_shadowsocks(url: &str) -> Result<XrayProxyConfig, String> {
   }
 
   // Handle legacy format (entire URL is base64 encoded)
+  let base64_part = url_without_scheme.split('#').next().unwrap_or(url_without_scheme);
   let decoded = general_purpose::STANDARD
-    .decode(url_without_scheme.split('#').next().unwrap_or(url_without_scheme))
-    .or_else(|_| general_purpose::URL_SAFE.decode(url_without_scheme.split('#').next().unwrap_or(url_without_scheme)))
+    .decode(base64_part)
+    .or_else(|_| general_purpose::URL_SAFE.decode(base64_part))
     .map_err(|e| format!("Failed to decode Shadowsocks URL: {}", e))?;
 
   let decoded_str = String::from_utf8(decoded)
@@ -453,7 +454,10 @@ mod tests {
 
   #[test]
   fn test_parse_vless_url() {
-    let url = "vless://uuid-here@example.com:443?encryption=none&security=tls&sni=example.com&type=ws&path=%2Fpath#Remark";
+    let url = concat!(
+      "vless://uuid-here@example.com:443",
+      "?encryption=none&security=tls&sni=example.com&type=ws&path=%2Fpath#Remark"
+    );
     let config = parse_proxy_url(url).unwrap();
 
     assert_eq!(config.protocol, XrayProtocol::VLESS);
