@@ -77,28 +77,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build nodecar binary
-        shell: bash
-        working-directory: ./nodecar
-        run: |
-          if [[ "${{ matrix.os }}" == "ubuntu-22.04" ]]; then
-            pnpm run build:linux-x64
-          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            pnpm run build:mac-aarch64
-          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            pnpm run build:win-x64
-          fi
-
-      - name: Copy nodecar binary to Tauri binaries
-        shell: bash
-        run: |
-          mkdir -p src-tauri/binaries
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            cp nodecar/nodecar-bin.exe src-tauri/binaries/nodecar-${{ matrix.target }}.exe
-          else
-            cp nodecar/nodecar-bin src-tauri/binaries/nodecar-${{ matrix.target }}
-          fi
-
       - name: Build frontend
         run: pnpm next build
 
