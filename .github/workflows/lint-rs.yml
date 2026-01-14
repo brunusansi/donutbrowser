@@ -30,7 +30,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-22.04]
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            xray_asset: "Xray-macos-arm64-v8a.zip"
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            xray_asset: "Xray-linux-64.zip"
 
     runs-on: ${{ matrix.os }}
 
@@ -71,6 +77,28 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build nodecar binary
+        shell: bash
+        working-directory: ./nodecar
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-22.04" ]]; then
+            pnpm run build:linux-x64
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            pnpm run build:mac-aarch64
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            pnpm run build:win-x64
+          fi
+
+      - name: Copy nodecar binary to Tauri binaries
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp nodecar/nodecar-bin.exe src-tauri/binaries/nodecar-${{ matrix.target }}.exe
+          else
+            cp nodecar/nodecar-bin src-tauri/binaries/nodecar-${{ matrix.target }}
+          fi
+
       - name: Build frontend
         run: pnpm next build
 
@@ -103,6 +131,32 @@ jobs:
             chmod +x src-tauri/binaries/donut-proxy-${HOST_TARGET}
             chmod +x src-tauri/binaries/donut-daemon-${HOST_TARGET}
           fi
+
+      - name: Download and extract Xray-core
+        shell: bash
+        run: |
+          XRAY_VERSION="v25.1.1"
+          XRAY_URL="https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${{ matrix.xray_asset }}"
+          
+          echo "Downloading Xray-core from: ${XRAY_URL}"
+          mkdir -p src-tauri/binaries/xray
+          curl -L -o xray.zip "${XRAY_URL}"
+          
+          # Extract based on platform
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            unzip -o xray.zip -d src-tauri/binaries/xray
+            mv src-tauri/binaries/xray/xray.exe src-tauri/binaries/xray-${{ matrix.target }}.exe
+          else
+            unzip -o xray.zip -d src-tauri/binaries/xray
+            mv src-tauri/binaries/xray/xray src-tauri/binaries/xray-${{ matrix.target }}
+            chmod +x src-tauri/binaries/xray-${{ matrix.target }}
+          fi
+          
+          # Clean up
+          rm -rf xray.zip src-tauri/binaries/xray
+          
+          echo "Xray-core installed successfully"
+          ls -la src-tauri/binaries/
 
       - name: Run rustfmt check
         run: cargo fmt --all -- --check
