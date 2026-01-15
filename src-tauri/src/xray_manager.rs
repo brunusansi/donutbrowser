@@ -5,20 +5,18 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
 /// Xray release info from GitHub API
 #[derive(Debug, Clone, Deserialize)]
 struct GitHubRelease {
   tag_name: String,
+  #[allow(dead_code)]
   assets: Vec<GitHubAsset>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct GitHubAsset {
   name: String,
   browser_download_url: String,
@@ -34,7 +32,7 @@ pub struct XrayInstance {
   pub config_path: PathBuf,
 }
 
-/// Global Xray instances registry
+// Global Xray instances registry
 lazy_static::lazy_static! {
   static ref XRAY_INSTANCES: Mutex<std::collections::HashMap<String, XrayInstance>> =
     Mutex::new(std::collections::HashMap::new());
