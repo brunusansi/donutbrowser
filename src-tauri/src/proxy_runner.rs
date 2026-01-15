@@ -2,6 +2,7 @@ use crate::proxy_storage::{
   delete_proxy_config, generate_proxy_id, get_proxy_config, is_process_running, list_proxy_configs,
   save_proxy_config, ProxyConfig,
 };
+use crate::xray_manager;
 use std::process::Stdio;
 lazy_static::lazy_static! {
   static ref PROXY_PROCESSES: std::sync::Mutex<std::collections::HashMap<String, u32>> =
@@ -22,6 +23,11 @@ pub async fn start_proxy_process_with_profile(
 ) -> Result<ProxyConfig, Box<dyn std::error::Error>> {
   let id = generate_proxy_id();
   let upstream = upstream_url.unwrap_or_else(|| "DIRECT".to_string());
+
+  // Check if this is an Xray protocol (vmess, vless, trojan, ss)
+  if xray_manager::requires_xray(&upstream) {
+    return start_xray_proxy_process(&id, &upstream, port, profile_id).await;
+  }
 
   // Get available port if not specified
   let local_port = port.unwrap_or_else(|| {
@@ -259,5 +265,64 @@ pub async fn stop_all_proxy_processes() -> Result<(), Box<dyn std::error::Error>
   for config in configs {
     let _ = stop_proxy_process(&config.id).await;
   }
+  // Also stop all Xray instances
+  let _ = xray_manager::stop_all_xray_instances().await;
   Ok(())
+}
+
+/// Start a proxy process using Xray for advanced protocols (vmess, vless, trojan, ss)
+async fn start_xray_proxy_process(
+  id: &str,
+  upstream_url: &str,
+  port: Option<u16>,
+  profile_id: Option<String>,
+) -> Result<ProxyConfig, Box<dyn std::error::Error>> {
+  // Check if Xray is installed
+  if !xray_manager::is_xray_installed() {
+    return Err(
+      "Xray is not installed. Please go to Settings > Network Engine to download Xray.".into(),
+    );
+  }
+
+  // Get available port if not specified
+  let local_port = port.unwrap_or_else(|| {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.local_addr().unwrap().port()
+  });
+
+  log::info!(
+    "Starting Xray proxy {} on port {} for protocol {}",
+    id,
+    local_port,
+    upstream_url.split("://").next().unwrap_or("unknown")
+  );
+
+  // Start Xray instance
+  let instance = xray_manager::start_xray_instance(id, upstream_url, local_port, None)
+    .await
+    .map_err(|e| format!("Failed to start Xray: {}", e))?;
+
+  // Create proxy config pointing to the Xray SOCKS port
+  let local_url = format!("socks5://127.0.0.1:{}", local_port);
+  let mut config =
+    ProxyConfig::new(id.to_string(), upstream_url.to_string(), Some(local_port))
+      .with_profile_id(profile_id.clone());
+  config.local_url = Some(local_url);
+  config.pid = Some(instance.pid);
+
+  save_proxy_config(&config)?;
+
+  // Store PID
+  {
+    let mut processes = PROXY_PROCESSES.lock().unwrap();
+    processes.insert(id.to_string(), instance.pid);
+  }
+
+  if let Some(ref pid) = profile_id {
+    log::info!("Xray proxy {} started with profile_id: {}", id, pid);
+  } else {
+    log::info!("Xray proxy {} started without profile_id", id);
+  }
+
+  Ok(config)
 }

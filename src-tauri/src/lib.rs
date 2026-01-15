@@ -46,6 +46,8 @@ pub mod events;
 mod mcp_server;
 mod tag_manager;
 mod version_updater;
+pub mod xray_config;
+pub mod xray_manager;
 
 use browser_runner::{
   check_browser_exists, kill_browser_profile, launch_browser_profile, open_url_with_profile,
@@ -369,6 +371,72 @@ async fn download_geoip_database(app_handle: tauri::AppHandle) -> Result<(), Str
     .download_geoip_database(&app_handle)
     .await
     .map_err(|e| format!("Failed to download GeoIP database: {e}"))
+}
+
+// Xray commands
+#[tauri::command]
+fn is_xray_installed() -> bool {
+  xray_manager::is_xray_installed()
+}
+
+#[tauri::command]
+async fn get_xray_version() -> Result<String, String> {
+  xray_manager::get_xray_version()
+    .await
+    .map_err(|e| format!("Failed to get Xray version: {e}"))
+}
+
+#[tauri::command]
+async fn download_xray(app_handle: tauri::AppHandle) -> Result<String, String> {
+  use std::sync::atomic::{AtomicU64, Ordering};
+  use std::sync::Arc;
+
+  let downloaded = Arc::new(AtomicU64::new(0));
+  let total = Arc::new(AtomicU64::new(0));
+  let app_handle_clone = app_handle.clone();
+  let downloaded_clone = downloaded.clone();
+  let total_clone = total.clone();
+
+  let progress_callback = Box::new(move |dl: u64, tot: u64| {
+    downloaded_clone.store(dl, Ordering::Relaxed);
+    total_clone.store(tot, Ordering::Relaxed);
+
+    // Emit progress event
+    let _ = app_handle_clone.emit(
+      "xray-download-progress",
+      serde_json::json!({
+        "downloaded": dl,
+        "total": tot,
+        "percentage": if tot > 0 { (dl as f64 / tot as f64 * 100.0) as u32 } else { 0 }
+      }),
+    );
+  });
+
+  xray_manager::download_xray(Some(progress_callback))
+    .await
+    .map_err(|e| format!("Failed to download Xray: {e}"))
+}
+
+#[tauri::command]
+fn parse_proxy_url(url: String) -> Result<serde_json::Value, String> {
+  let parsed = xray_config::parse_proxy_url(&url, "proxy_main")
+    .map_err(|e| format!("Failed to parse proxy URL: {e}"))?;
+
+  Ok(serde_json::json!({
+    "protocol": parsed.protocol,
+    "remark": parsed.remark,
+    "tag": parsed.tag
+  }))
+}
+
+#[tauri::command]
+fn get_proxy_remark(url: String) -> Option<String> {
+  xray_config::get_proxy_remark(&url)
+}
+
+#[tauri::command]
+fn is_xray_protocol(url: String) -> bool {
+  xray_config::is_xray_protocol(&url)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -955,7 +1023,13 @@ pub fn run() {
       start_mcp_server,
       stop_mcp_server,
       get_mcp_server_status,
-      get_mcp_config
+      get_mcp_config,
+      is_xray_installed,
+      get_xray_version,
+      download_xray,
+      parse_proxy_url,
+      get_proxy_remark,
+      is_xray_protocol
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
