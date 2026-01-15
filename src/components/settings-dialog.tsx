@@ -1,6 +1,7 @@
 "use client";
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import Color from "color";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useState } from "react";
@@ -111,6 +112,10 @@ export function SettingsDialog({
   const [requestingPermission, setRequestingPermission] =
     useState<PermissionType | null>(null);
   const [isMacOS, setIsMacOS] = useState(false);
+  const [xrayInstalled, setXrayInstalled] = useState<boolean | null>(null);
+  const [xrayVersion, setXrayVersion] = useState<string | null>(null);
+  const [isDownloadingXray, setIsDownloadingXray] = useState(false);
+  const [xrayDownloadProgress, setXrayDownloadProgress] = useState(0);
 
   const { setTheme } = useTheme();
   const {
@@ -253,6 +258,41 @@ export function SettingsDialog({
       setIsDefaultBrowser(isDefault);
     } catch (error) {
       console.error("Failed to check default browser status:", error);
+    }
+  }, []);
+
+  const checkXrayStatus = useCallback(async () => {
+    try {
+      const installed = await invoke<boolean>("is_xray_installed");
+      setXrayInstalled(installed);
+      if (installed) {
+        const version = await invoke<string>("get_xray_version");
+        setXrayVersion(version);
+      }
+    } catch (error) {
+      console.error("Failed to check Xray status:", error);
+    }
+  }, []);
+
+  const handleDownloadXray = useCallback(async () => {
+    setIsDownloadingXray(true);
+    setXrayDownloadProgress(0);
+    try {
+      const version = await invoke<string>("download_xray");
+      setXrayInstalled(true);
+      setXrayVersion(version);
+      showSuccessToast("Xray installed successfully", {
+        description: `Version ${version} is now ready to use.`,
+      });
+    } catch (error) {
+      console.error("Failed to download Xray:", error);
+      showErrorToast("Failed to download Xray", {
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    } finally {
+      setIsDownloadingXray(false);
+      setXrayDownloadProgress(0);
     }
   }, []);
 
@@ -406,6 +446,7 @@ export function SettingsDialog({
     if (isOpen) {
       loadSettings().catch(console.error);
       checkDefaultBrowserStatus().catch(console.error);
+      checkXrayStatus().catch(console.error);
 
       // Check if we're on macOS
       const userAgent = navigator.userAgent;
@@ -421,12 +462,27 @@ export function SettingsDialog({
         checkDefaultBrowserStatus().catch(console.error);
       }, 500); // Check every 500ms
 
+      // Listen for Xray download progress
+      const unlistenPromise = listen<{ percentage: number }>(
+        "xray-download-progress",
+        (event) => {
+          setXrayDownloadProgress(event.payload.percentage);
+        },
+      );
+
       // Cleanup interval on component unmount or dialog close
       return () => {
         clearInterval(intervalId);
+        unlistenPromise.then((unlisten) => unlisten());
       };
     }
-  }, [isOpen, loadPermissions, checkDefaultBrowserStatus, loadSettings]);
+  }, [
+    isOpen,
+    loadPermissions,
+    checkDefaultBrowserStatus,
+    checkXrayStatus,
+    loadSettings,
+  ]);
 
   // Update permissions when the permission states change
   useEffect(() => {
@@ -760,6 +816,67 @@ export function SettingsDialog({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Network Engine Section */}
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Network Engine</Label>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Xray-core enables advanced proxy protocols like VMess, VLESS,
+              Trojan, and Shadowsocks.
+            </p>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Xray Core</span>
+                  {xrayInstalled === true && (
+                    <Badge
+                      variant="default"
+                      className="text-green-800 bg-green-100"
+                    >
+                      Installed
+                    </Badge>
+                  )}
+                  {xrayInstalled === false && (
+                    <Badge variant="secondary">Not Installed</Badge>
+                  )}
+                </div>
+                {xrayVersion && (
+                  <p className="text-xs text-muted-foreground">
+                    Version: {xrayVersion}
+                  </p>
+                )}
+              </div>
+              {xrayInstalled === false && (
+                <LoadingButton
+                  size="sm"
+                  isLoading={isDownloadingXray}
+                  onClick={() => handleDownloadXray()}
+                >
+                  {isDownloadingXray
+                    ? `Downloading ${xrayDownloadProgress}%`
+                    : "Download"}
+                </LoadingButton>
+              )}
+              {xrayInstalled === true && (
+                <LoadingButton
+                  size="sm"
+                  variant="outline"
+                  isLoading={isDownloadingXray}
+                  onClick={() => handleDownloadXray()}
+                >
+                  {isDownloadingXray
+                    ? `Updating ${xrayDownloadProgress}%`
+                    : "Update"}
+                </LoadingButton>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Supported protocols: VMess, VLESS, Trojan, Shadowsocks (ss://),
+              SOCKS5, HTTP. Supports REALITY, WebSocket, gRPC, mKCP transports.
+            </p>
           </div>
 
           {/* Advanced Section */}
