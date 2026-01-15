@@ -1,13 +1,6 @@
 use directories::BaseDirs;
 use std::path::PathBuf;
-use std::process::Stdio;
-use tokio::process::Command as TokioCommand;
 
-use crate::browser::{create_browser, BrowserType};
-use crate::downloaded_browsers_registry::DownloadedBrowsersRegistry;
-use crate::profile::ProfileManager;
-
-const ACCEPT_TERMS_FLAG: &str = "--accept-terms-and-conditions";
 const MIN_VALID_TIMESTAMP: i64 = 1577836800; // 2020-01-01 00:00:00 UTC
 
 pub struct WayfernTermsManager {
@@ -97,84 +90,27 @@ impl WayfernTermsManager {
     timestamp >= MIN_VALID_TIMESTAMP
   }
 
-  fn get_any_wayfern_executable(&self) -> Option<PathBuf> {
-    // First try to get executable from any downloaded Wayfern version
-    let registry = DownloadedBrowsersRegistry::instance();
-    let versions = registry.get_downloaded_versions("wayfern");
-
-    if versions.is_empty() {
-      return None;
-    }
-
-    // Get first available version
-    let version = versions.first()?;
-
-    // Get binaries directory
-    let binaries_dir = ProfileManager::instance().get_binaries_dir();
-    let mut browser_dir = binaries_dir;
-    browser_dir.push("wayfern");
-    browser_dir.push(version);
-
-    let browser = create_browser(BrowserType::Wayfern);
-    browser.get_executable_path(&browser_dir).ok()
-  }
-
   pub async fn accept_terms(&self) -> Result<(), String> {
-    let executable_path = self.get_any_wayfern_executable().ok_or_else(|| {
-      "No Wayfern browser downloaded. Please download a Wayfern browser version first.".to_string()
-    })?;
+    let license_file = self.get_license_file_path();
 
-    log::info!(
-      "Running Wayfern with {} flag: {:?}",
-      ACCEPT_TERMS_FLAG,
-      executable_path
-    );
-
-    #[cfg(target_os = "macos")]
-    {
-      // On macOS, if it's an app bundle, we need to find the actual executable
-      let executable_str = executable_path.to_string_lossy();
-      if executable_str.ends_with(".app") {
-        // Navigate to Contents/MacOS and find the executable
-        let macos_dir = executable_path.join("Contents").join("MacOS");
-        if let Ok(entries) = std::fs::read_dir(&macos_dir) {
-          for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-              return self.run_accept_command(&path).await;
-            }
-          }
-        }
-        return Err("Could not find executable in Wayfern app bundle".to_string());
-      }
+    // Create the parent directory if it doesn't exist
+    if let Some(parent) = license_file.parent() {
+      std::fs::create_dir_all(parent)
+        .map_err(|e| format!("Failed to create license directory: {e}"))?;
     }
 
-    self.run_accept_command(&executable_path).await
-  }
+    // Write the current timestamp to the license file
+    let timestamp = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .map_err(|e| format!("Failed to get current timestamp: {e}"))?
+      .as_secs();
 
-  async fn run_accept_command(&self, executable_path: &PathBuf) -> Result<(), String> {
-    let output = TokioCommand::new(executable_path)
-      .arg(ACCEPT_TERMS_FLAG)
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
-      .output()
-      .await
-      .map_err(|e| format!("Failed to run Wayfern: {e}"))?;
+    std::fs::write(&license_file, timestamp.to_string())
+      .map_err(|e| format!("Failed to write license file: {e}"))?;
 
-    if !output.status.success() {
-      let stderr = String::from_utf8_lossy(&output.stderr);
-      log::error!("Wayfern terms acceptance failed: {stderr}");
-      return Err(format!(
-        "Wayfern terms acceptance failed with exit code: {:?}",
-        output.status.code()
-      ));
-    }
-
-    // Verify the license file was created
+    // Verify the license file was created correctly
     if !self.is_terms_accepted() {
-      return Err(
-        "Terms acceptance command succeeded but license file was not created".to_string(),
-      );
+      return Err("License file was written but verification failed".to_string());
     }
 
     log::info!("Wayfern terms and conditions accepted successfully");
