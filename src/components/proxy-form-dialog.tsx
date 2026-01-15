@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LoadingButton } from "@/components/loading-button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,9 @@ import {
 } from "@/components/ui/select";
 import type { StoredProxy } from "@/types";
 import { RippleButton } from "./ui/ripple";
+
+// Advanced protocols that require external client
+const ADVANCED_PROTOCOLS = ["ss", "vmess", "vless", "trojan"];
 
 interface ProxyFormData {
   name: string;
@@ -179,13 +183,39 @@ export function ProxyFormDialog({
                 <SelectValue placeholder="Select proxy type" />
               </SelectTrigger>
               <SelectContent>
-                {["http", "https", "socks4", "socks5"].map((type) => (
+                {[
+                  "http",
+                  "https",
+                  "socks4",
+                  "socks5",
+                  "ss",
+                  "vmess",
+                  "vless",
+                  "trojan",
+                ].map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type.toUpperCase()}
+                    {type === "ss"
+                      ? "Shadowsocks (ss://)"
+                      : type === "vmess"
+                        ? "VMess"
+                        : type === "vless"
+                          ? "VLESS"
+                          : type === "trojan"
+                            ? "Trojan"
+                            : type.toUpperCase()}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {ADVANCED_PROTOCOLS.includes(formData.proxy_type) && (
+              <Alert className="mt-2">
+                <AlertDescription>
+                  ⚠️ {formData.proxy_type.toUpperCase()} protocol requires an
+                  external client (e.g., v2ray, sing-box, clash) running locally
+                  that converts to SOCKS5. Configure the local SOCKS5 port here.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

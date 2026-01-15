@@ -253,6 +253,19 @@ async fn handle_connect(
           }
         }
       }
+      "ss" | "vmess" | "vless" | "trojan" => {
+        // These protocols are not yet implemented
+        log::error!(
+          "Protocol {} is not yet implemented in the proxy server",
+          scheme
+        );
+        let mut response = Response::new(Full::new(Bytes::from(format!(
+          "Protocol {} is not yet implemented. Please use HTTP, HTTPS, SOCKS4, or SOCKS5 proxies. For advanced protocols (Shadowsocks, VMess, VLESS, Trojan), please run a local client that converts to SOCKS5.",
+          scheme
+        ))));
+        *response.status_mut() = StatusCode::NOT_IMPLEMENTED;
+        Ok(response)
+      }
       _ => {
         let mut response = Response::new(Full::new(Bytes::from("Unsupported upstream scheme")));
         *response.status_mut() = StatusCode::BAD_GATEWAY;
@@ -693,9 +706,22 @@ async fn handle_http(
   if let Some(ref upstream) = upstream_url {
     if upstream != "DIRECT" {
       if let Ok(url) = Url::parse(upstream) {
-        if url.scheme() == "socks4" {
+        let scheme = url.scheme();
+        if scheme == "socks4" {
           // Handle SOCKS4 manually for HTTP requests
           return handle_http_via_socks4(req, upstream).await;
+        } else if scheme == "ss" || scheme == "vmess" || scheme == "vless" || scheme == "trojan" {
+          // These protocols are not yet implemented
+          log::error!(
+            "Protocol {} is not yet implemented in the proxy server",
+            scheme
+          );
+          let mut response = Response::new(Full::new(Bytes::from(format!(
+            "Protocol {} is not yet implemented. Please use HTTP, HTTPS, SOCKS4, or SOCKS5 proxies. For advanced protocols (Shadowsocks, VMess, VLESS, Trojan), please run a local client that converts to SOCKS5.",
+            scheme
+          ))));
+          *response.status_mut() = StatusCode::NOT_IMPLEMENTED;
+          return Ok(response);
         }
       }
     }

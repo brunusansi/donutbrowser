@@ -1,5 +1,5 @@
 export interface ProxySettings {
-  proxy_type: string; // "http", "https", "socks4", or "socks5"
+  proxy_type: string; // "http", "https", "socks4", "socks5", "ss", "vmess", "vless", "trojan"
   host: string;
   port: number;
   username?: string;

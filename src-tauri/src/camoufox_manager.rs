@@ -211,6 +211,14 @@ impl CamoufoxManager {
         .map_err(|e| format!("Failed to get Camoufox executable path: {e}"))?
     };
 
+    // Ensure the profile directory exists before launching
+    let profile_dir = std::path::Path::new(profile_path);
+    if !profile_dir.exists() {
+      std::fs::create_dir_all(profile_dir)
+        .map_err(|e| format!("Failed to create profile directory: {e}"))?;
+      log::info!("Created profile directory: {}", profile_path);
+    }
+
     // Parse the fingerprint config JSON
     let fingerprint_config: HashMap<String, serde_json::Value> =
       serde_json::from_str(&custom_config)

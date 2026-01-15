@@ -407,6 +407,14 @@ impl WayfernManager {
         .map_err(|e| format!("Failed to get Wayfern executable path: {e}"))?
     };
 
+    // Ensure the profile directory exists before launching
+    let profile_dir = std::path::Path::new(profile_path);
+    if !profile_dir.exists() {
+      std::fs::create_dir_all(profile_dir)
+        .map_err(|e| format!("Failed to create profile directory: {e}"))?;
+      log::info!("Created profile directory: {}", profile_path);
+    }
+
     let port = Self::find_free_port().await?;
     log::info!("Launching Wayfern on CDP port {port}");
 
