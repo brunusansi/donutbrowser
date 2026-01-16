@@ -43,14 +43,8 @@ fn parse_vmess(url_str: &str, tag: &str) -> Result<ParsedProxy, String> {
     .get("aid")
     .and_then(|v| v.as_str().map(|s| s.parse().unwrap_or(0)).or(v.as_u64()))
     .unwrap_or(0);
-  let security = vmess
-    .get("scy")
-    .and_then(|v| v.as_str())
-    .unwrap_or("auto");
-  let net = vmess
-    .get("net")
-    .and_then(|v| v.as_str())
-    .unwrap_or("tcp");
+  let security = vmess.get("scy").and_then(|v| v.as_str()).unwrap_or("auto");
+  let net = vmess.get("net").and_then(|v| v.as_str()).unwrap_or("tcp");
   let tls = vmess.get("tls").and_then(|v| v.as_str()).unwrap_or("none");
   let host = vmess
     .get("host")
@@ -98,20 +92,14 @@ fn parse_vmess(url_str: &str, tag: &str) -> Result<ParsedProxy, String> {
       });
     }
     "kcp" => {
-      let header_type = vmess
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("none");
+      let header_type = vmess.get("type").and_then(|v| v.as_str()).unwrap_or("none");
       stream_settings["kcpSettings"] = json!({
         "header": { "type": header_type },
         "seed": path
       });
     }
     "quic" => {
-      let header_type = vmess
-        .get("type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("none");
+      let header_type = vmess.get("type").and_then(|v| v.as_str()).unwrap_or("none");
       stream_settings["quicSettings"] = json!({
         "security": host,
         "key": path,
@@ -409,8 +397,8 @@ fn parse_shadowsocks(url_str: &str, tag: &str) -> Result<ParsedProxy, String> {
       let decoded = STANDARD
         .decode(user_part.replace(['-', '_'], "+"))
         .map_err(|e| format!("Failed to decode ss base64: {}", e))?;
-      let decoded_str = String::from_utf8(decoded)
-        .map_err(|e| format!("Invalid UTF-8 in ss user part: {}", e))?;
+      let decoded_str =
+        String::from_utf8(decoded).map_err(|e| format!("Invalid UTF-8 in ss user part: {}", e))?;
       let user_parts: Vec<&str> = decoded_str.splitn(2, ':').collect();
       if user_parts.len() != 2 {
         return Err("Invalid ss user part format".to_string());
@@ -426,7 +414,9 @@ fn parse_shadowsocks(url_str: &str, tag: &str) -> Result<ParsedProxy, String> {
       let port_str = &host_part[end_bracket + 2..]; // Skip ]:
       (
         host.to_string(),
-        port_str.parse::<u16>().map_err(|e| format!("Invalid port: {}", e))?,
+        port_str
+          .parse::<u16>()
+          .map_err(|e| format!("Invalid port: {}", e))?,
       )
     } else {
       // IPv4 or hostname
@@ -435,7 +425,9 @@ fn parse_shadowsocks(url_str: &str, tag: &str) -> Result<ParsedProxy, String> {
       let port_str = &host_part[last_colon + 1..];
       (
         host.to_string(),
-        port_str.parse::<u16>().map_err(|e| format!("Invalid port: {}", e))?,
+        port_str
+          .parse::<u16>()
+          .map_err(|e| format!("Invalid port: {}", e))?,
       )
     };
 

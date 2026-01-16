@@ -383,7 +383,11 @@ pub async fn start_xray_instance(
   while attempts < max_attempts {
     match tokio::net::TcpStream::connect(("127.0.0.1", local_port)).await {
       Ok(_) => {
-        log::info!("Xray instance {} started successfully on port {}", id, local_port);
+        log::info!(
+          "Xray instance {} started successfully on port {}",
+          id,
+          local_port
+        );
         return Ok(instance);
       }
       Err(_) => {
@@ -399,7 +403,9 @@ pub async fn start_xray_instance(
 }
 
 /// Stop Xray instance
-pub async fn stop_xray_instance(id: &str) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn stop_xray_instance(
+  id: &str,
+) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
   let instance = {
     let mut instances = XRAY_INSTANCES.lock().await;
     instances.remove(id)
