@@ -305,7 +305,8 @@ async fn start_xray_proxy_process(
   // Create proxy config pointing to the Xray SOCKS port
   let local_url = format!("socks5://127.0.0.1:{}", local_port);
   let mut config = ProxyConfig::new(id.to_string(), upstream_url.to_string(), Some(local_port))
-    .with_profile_id(profile_id.clone());
+    .with_profile_id(profile_id.clone())
+    .with_local_proxy_type("socks5");
   config.local_url = Some(local_url);
   config.pid = Some(instance.pid);
 

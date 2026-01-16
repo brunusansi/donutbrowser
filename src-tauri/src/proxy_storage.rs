@@ -13,6 +13,8 @@ pub struct ProxyConfig {
   pub pid: Option<u32>,
   #[serde(default)]
   pub profile_id: Option<String>,
+  #[serde(default)]
+  pub local_proxy_type: Option<String>, // "http", "socks5", etc.
 }
 
 impl ProxyConfig {
@@ -25,11 +27,17 @@ impl ProxyConfig {
       local_url: None,
       pid: None,
       profile_id: None,
+      local_proxy_type: None,
     }
   }
 
   pub fn with_profile_id(mut self, profile_id: Option<String>) -> Self {
     self.profile_id = profile_id;
+    self
+  }
+
+  pub fn with_local_proxy_type(mut self, proxy_type: &str) -> Self {
+    self.local_proxy_type = Some(proxy_type.to_string());
     self
   }
 }

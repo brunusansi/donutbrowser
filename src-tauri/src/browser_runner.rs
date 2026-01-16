@@ -144,8 +144,8 @@ impl BrowserRunner {
           error_msg
         })?;
 
-      // Format proxy URL for camoufox - always use HTTP for the local proxy
-      let proxy_url = format!("http://{}:{}", local_proxy.host, local_proxy.port);
+      // Format proxy URL for camoufox - use the correct protocol based on proxy type
+      let proxy_url = format!("{}://{}:{}", local_proxy.proxy_type, local_proxy.host, local_proxy.port);
 
       // Set proxy in camoufox config
       camoufox_config.proxy = Some(proxy_url);
@@ -343,8 +343,8 @@ impl BrowserRunner {
           error_msg
         })?;
 
-      // Format proxy URL for wayfern - always use HTTP for the local proxy
-      let proxy_url = format!("http://{}:{}", local_proxy.host, local_proxy.port);
+      // Format proxy URL for wayfern - use the correct protocol based on proxy type
+      let proxy_url = format!("{}://{}:{}", local_proxy.proxy_type, local_proxy.host, local_proxy.port);
 
       // Set proxy in wayfern config
       wayfern_config.proxy = Some(proxy_url);
@@ -1015,6 +1015,7 @@ impl BrowserRunner {
           port: internal_proxy.port,
           username: None,
           password: None,
+          url: None,
         };
 
         self
@@ -2454,6 +2455,7 @@ pub async fn launch_browser_profile(
             port: internal_proxy.port,
             username: None,
             password: None,
+            url: None,
           };
 
           browser_runner

@@ -1211,6 +1211,7 @@ impl McpServer {
       port,
       username,
       password,
+      url: None,
     };
 
     let inner = self.inner.lock().await;
@@ -1303,6 +1304,7 @@ impl McpServer {
         port,
         username,
         password,
+        url: None,
       })
     } else {
       None

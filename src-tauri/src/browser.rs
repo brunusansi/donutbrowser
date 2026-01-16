@@ -9,6 +9,8 @@ pub struct ProxySettings {
   pub port: u16,
   pub username: Option<String>,
   pub password: Option<String>,
+  #[serde(default)]
+  pub url: Option<String>, // Original URL for Xray protocols (ss://, vmess://, vless://, trojan://)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -893,9 +895,15 @@ impl Browser for ChromiumBrowser {
 
     // Add proxy configuration if provided
     if let Some(proxy) = proxy_settings {
+      let proxy_scheme = match proxy.proxy_type.as_str() {
+        "socks5" => "socks5",
+        "socks4" => "socks4",
+        "https" => "https",
+        _ => "http",
+      };
       args.push(format!(
-        "--proxy-server=http://{}:{}",
-        proxy.host, proxy.port
+        "--proxy-server={}://{}:{}",
+        proxy_scheme, proxy.host, proxy.port
       ));
     }
 
@@ -1102,9 +1110,15 @@ impl Browser for WayfernBrowser {
 
     // Add proxy configuration if provided
     if let Some(proxy) = proxy_settings {
+      let proxy_scheme = match proxy.proxy_type.as_str() {
+        "socks5" => "socks5",
+        "socks4" => "socks4",
+        "https" => "https",
+        _ => "http",
+      };
       args.push(format!(
-        "--proxy-server=http://{}:{}",
-        proxy.host, proxy.port
+        "--proxy-server={}://{}:{}",
+        proxy_scheme, proxy.host, proxy.port
       ));
     }
 
@@ -1434,6 +1448,7 @@ mod tests {
       port: 8080,
       username: None,
       password: None,
+      url: None,
     };
 
     assert_eq!(proxy.proxy_type, "http");
@@ -1447,6 +1462,7 @@ mod tests {
       port: 1080,
       username: None,
       password: None,
+      url: None,
     };
 
     assert_eq!(socks_proxy.proxy_type, "socks5");
@@ -1593,6 +1609,7 @@ mod tests {
       port: 8080,
       username: None,
       password: None,
+      url: None,
     };
 
     // Test that it can be serialized (implements Serialize)

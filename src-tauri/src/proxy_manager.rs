@@ -11,6 +11,8 @@ use tauri_plugin_shell::ShellExt;
 use crate::browser::ProxySettings;
 use crate::events;
 use crate::ip_utils;
+use crate::proxy_runner;
+use crate::xray_manager;
 
 // Store active proxy information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -587,6 +589,7 @@ impl ProxyManager {
                 port: existing.local_port,
                 username: None,
                 password: None,
+                url: None,
               });
             }
             // Need to add this PID to the mapping - we'll do that after starting
@@ -627,6 +630,7 @@ impl ProxyManager {
               port: existing.local_port,
               username: None,
               password: None,
+              url: None,
             });
           }
           // Profile ID changed - we'll create a new proxy but don't stop the old one
@@ -634,6 +638,59 @@ impl ProxyManager {
         }
         // Upstream changed - we'll create a new proxy but don't stop the old one
         // It will be cleaned up by periodic cleanup if it becomes dead
+      }
+    }
+
+    // Check if this is an Xray protocol (vmess, vless, trojan, ss)
+    // For Xray protocols, we need to use a different flow
+    if let Some(ps) = proxy_settings {
+      // Use URL field if available (for ss://, vmess://, vless://, trojan://),
+      // otherwise construct from type/host/port
+      let upstream_url = ps.url.clone().unwrap_or_else(|| {
+        format!("{}://{}:{}", ps.proxy_type, ps.host, ps.port)
+      });
+      if xray_manager::requires_xray(&upstream_url) {
+        // Use Xray for advanced protocols
+        let config = proxy_runner::start_proxy_process_with_profile(
+          Some(upstream_url),
+          None,
+          profile_id.map(|s| s.to_string()),
+        )
+        .await
+        .map_err(|e| format!("Failed to start Xray proxy: {e}"))?;
+
+        let local_port = config.local_port.ok_or("Missing local port")?;
+        let local_proxy_type = config.local_proxy_type.unwrap_or_else(|| "socks5".to_string());
+
+        let proxy_info = ProxyInfo {
+          id: config.id.clone(),
+          local_url: config.local_url.unwrap_or_else(|| format!("socks5://127.0.0.1:{}", local_port)),
+          upstream_host: ps.host.clone(),
+          upstream_port: ps.port,
+          upstream_type: ps.proxy_type.clone(),
+          local_port,
+          profile_id: profile_id.map(|s| s.to_string()),
+        };
+
+        // Store the proxy info
+        {
+          let mut proxies = self.active_proxies.lock().unwrap();
+          proxies.insert(browser_pid, proxy_info.clone());
+        }
+
+        if let Some(id) = profile_id {
+          let mut map = self.profile_active_proxy_ids.lock().unwrap();
+          map.insert(id.to_string(), proxy_info.id.clone());
+        }
+
+        return Ok(ProxySettings {
+          proxy_type: local_proxy_type,
+          host: "127.0.0.1".to_string(),
+          port: local_port,
+          username: None,
+          password: None,
+          url: None,
+        });
       }
     }
 
@@ -760,10 +817,11 @@ impl ProxyManager {
     // Return proxy settings for the browser
     Ok(ProxySettings {
       proxy_type: "http".to_string(),
-      host: "127.0.0.1".to_string(), // Use 127.0.0.1 instead of localhost for better compatibility
+      host: "127.0.0.1".to_string(),
       port: proxy_info.local_port,
       username: None,
       password: None,
+      url: None,
     })
   }
 
@@ -1075,6 +1133,7 @@ mod tests {
       port: 8080,
       username: Some("user".to_string()),
       password: Some("pass".to_string()),
+      url: None,
     };
 
     assert!(
@@ -1102,6 +1161,7 @@ mod tests {
       port: 0,
       username: None,
       password: None,
+      url: None,
     };
 
     assert!(
@@ -1255,6 +1315,7 @@ mod tests {
       port: 8080,
       username: Some("user".to_string()),
       password: Some("pass".to_string()),
+      url: None,
     };
 
     // Test command arguments match expected format
