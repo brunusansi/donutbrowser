@@ -294,7 +294,7 @@ pub async fn start_xray_instance(
 
   // Generate config
   let config = generate_xray_config(upstream_url, local_port, pre_proxy_url)
-    .map_err(|e| Box::<dyn std::error::Error + Send + Sync>::from(e))?;
+    .map_err(Box::<dyn std::error::Error + Send + Sync>::from)?;
 
   // Write config to temp file
   let config_dir = get_xray_bin_dir().parent().unwrap().join("configs");
