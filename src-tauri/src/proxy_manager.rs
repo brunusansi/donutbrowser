@@ -646,9 +646,10 @@ impl ProxyManager {
     if let Some(ps) = proxy_settings {
       // Use URL field if available (for ss://, vmess://, vless://, trojan://),
       // otherwise construct from type/host/port
-      let upstream_url = ps.url.clone().unwrap_or_else(|| {
-        format!("{}://{}:{}", ps.proxy_type, ps.host, ps.port)
-      });
+      let upstream_url = ps
+        .url
+        .clone()
+        .unwrap_or_else(|| format!("{}://{}:{}", ps.proxy_type, ps.host, ps.port));
       if xray_manager::requires_xray(&upstream_url) {
         // Use Xray for advanced protocols
         let config = proxy_runner::start_proxy_process_with_profile(
@@ -660,11 +661,15 @@ impl ProxyManager {
         .map_err(|e| format!("Failed to start Xray proxy: {e}"))?;
 
         let local_port = config.local_port.ok_or("Missing local port")?;
-        let local_proxy_type = config.local_proxy_type.unwrap_or_else(|| "socks5".to_string());
+        let local_proxy_type = config
+          .local_proxy_type
+          .unwrap_or_else(|| "socks5".to_string());
 
         let proxy_info = ProxyInfo {
           id: config.id.clone(),
-          local_url: config.local_url.unwrap_or_else(|| format!("socks5://127.0.0.1:{}", local_port)),
+          local_url: config
+            .local_url
+            .unwrap_or_else(|| format!("socks5://127.0.0.1:{}", local_port)),
           upstream_host: ps.host.clone(),
           upstream_port: ps.port,
           upstream_type: ps.proxy_type.clone(),

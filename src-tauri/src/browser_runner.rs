@@ -145,7 +145,10 @@ impl BrowserRunner {
         })?;
 
       // Format proxy URL for camoufox - use the correct protocol based on proxy type
-      let proxy_url = format!("{}://{}:{}", local_proxy.proxy_type, local_proxy.host, local_proxy.port);
+      let proxy_url = format!(
+        "{}://{}:{}",
+        local_proxy.proxy_type, local_proxy.host, local_proxy.port
+      );
 
       // Set proxy in camoufox config
       camoufox_config.proxy = Some(proxy_url);
@@ -344,7 +347,10 @@ impl BrowserRunner {
         })?;
 
       // Format proxy URL for wayfern - use the correct protocol based on proxy type
-      let proxy_url = format!("{}://{}:{}", local_proxy.proxy_type, local_proxy.host, local_proxy.port);
+      let proxy_url = format!(
+        "{}://{}:{}",
+        local_proxy.proxy_type, local_proxy.host, local_proxy.port
+      );
 
       // Set proxy in wayfern config
       wayfern_config.proxy = Some(proxy_url);
